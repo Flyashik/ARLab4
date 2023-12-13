@@ -16,6 +16,8 @@
 package com.google.ar.core.examples.java.augmentedimage.rendering;
 
 import android.content.Context;
+import android.util.Log;
+
 import com.google.ar.core.Anchor;
 import com.google.ar.core.AugmentedImage;
 import com.google.ar.core.Pose;
@@ -46,7 +48,13 @@ public class AugmentedImageRenderer {
   private final ObjectRenderer imageFrameLowerLeft = new ObjectRenderer();
   private final ObjectRenderer imageFrameLowerRight = new ObjectRenderer();
 
+  private float mazeScaleFactor = 1.0f;
+
   public AugmentedImageRenderer() {}
+
+  public void updateMazeScale(float scaleFactor) {
+    mazeScaleFactor = scaleFactor;
+  }
 
   public void createOnGlThread(Context context) throws IOException {
     mazeRenderer.createOnGlThread(
@@ -92,9 +100,9 @@ public class AugmentedImageRenderer {
 
     Pose anchorPose = centerAnchor.getPose();
 
-    float mazeScaleFactor = maxImageEdgeSize / mazeEdgeSize; // scale to set Maze to image size
+    float mazeScaleFactor = (maxImageEdgeSize / mazeEdgeSize) * this.mazeScaleFactor; // scale to set Maze to image size
     float[] modelMatrix = new float[16];
-
+    Log.i("SCALE FACTOR", String.valueOf(mazeScaleFactor));
     // OpenGL Matrix operation is in the order: Scale, rotation and Translation
     // So the manual adjustment is after scale
     // The 251.3f and 129.0f is magic number from the maze obj file

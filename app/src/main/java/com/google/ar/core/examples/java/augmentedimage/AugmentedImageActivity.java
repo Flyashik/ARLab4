@@ -21,9 +21,11 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
+import android.opengl.Matrix;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Pair;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
@@ -52,6 +54,7 @@ import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -85,7 +88,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
   private final BackgroundRenderer backgroundRenderer = new BackgroundRenderer();
   private final AugmentedImageRenderer augmentedImageRenderer = new AugmentedImageRenderer();
-
   private boolean shouldConfigureSession = false;
 
   // Augmented image configuration and rendering.
@@ -95,6 +97,46 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
   // the
   // database.
   private final Map<Integer, Pair<AugmentedImage, Anchor>> augmentedImageMap = new HashMap<>();
+
+  private float currentScaleFactor = 1.0f;
+  private float initialDistance = -1.0f;
+
+  @Override
+  public boolean onTouchEvent(MotionEvent event) {
+    int pointerCount = event.getPointerCount();
+
+    switch (event.getActionMasked()) {
+      case MotionEvent.ACTION_DOWN:
+        break;
+
+      case MotionEvent.ACTION_MOVE:
+        if (pointerCount == 2) {
+          float newDistance = calculateDistance(event.getX(0), event.getY(0), event.getX(1), event.getY(1));
+
+          if (newDistance > initialDistance) {
+            currentScaleFactor += 0.01f;
+          } else if (newDistance < initialDistance) {
+            currentScaleFactor -= 0.01f;
+          }
+
+          initialDistance = newDistance;
+
+          augmentedImageRenderer.updateMazeScale(currentScaleFactor);
+        }
+        break;
+
+      case MotionEvent.ACTION_UP:
+      case MotionEvent.ACTION_POINTER_UP:
+        break;
+    }
+    return super.onTouchEvent(event);
+  }
+
+  private float calculateDistance(float x1, float y1, float x2, float y2) {
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    return (float) Math.sqrt(dx * dx + dy * dy);
+  }
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -114,8 +156,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     fitToScanView = findViewById(R.id.image_view_fit_to_scan);
     glideRequestManager = Glide.with(this);
     glideRequestManager
-        .load(Uri.parse("file:///android_asset/fit_to_scan.png"))
-        .into(fitToScanView);
+            .load(Uri.parse("file:///android_asset/fit_to_scan.png"))
+            .into(fitToScanView);
 
     installRequested = false;
   }
@@ -159,7 +201,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
         session = new Session(/* context = */ this);
       } catch (UnavailableArcoreNotInstalledException
-          | UnavailableUserDeclinedInstallationException e) {
+               | UnavailableUserDeclinedInstallationException e) {
         message = "Please install ARCore";
         exception = e;
       } catch (UnavailableApkTooOldException e) {
@@ -219,8 +261,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     super.onRequestPermissionsResult(requestCode, permissions, results);
     if (!CameraPermissionHelper.hasCameraPermission(this)) {
       Toast.makeText(
-              this, "Camera permissions are needed to run this application", Toast.LENGTH_LONG)
-          .show();
+                      this, "Camera permissions are needed to run this application", Toast.LENGTH_LONG)
+              .show();
       if (!CameraPermissionHelper.shouldShowRequestPermissionRationale(this)) {
         // Permission denied with checking "Do not ask again".
         CameraPermissionHelper.launchPermissionSettings(this);
@@ -312,9 +354,9 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
   }
 
   private void drawAugmentedImages(
-      Frame frame, float[] projmtx, float[] viewmtx, float[] colorCorrectionRgba) {
+          Frame frame, float[] projmtx, float[] viewmtx, float[] colorCorrectionRgba) {
     Collection<AugmentedImage> updatedAugmentedImages =
-        frame.getUpdatedTrackables(AugmentedImage.class);
+            frame.getUpdatedTrackables(AugmentedImage.class);
 
     // Iterate to update augmentedImageMap, remove elements we cannot draw.
     for (AugmentedImage augmentedImage : updatedAugmentedImages) {
@@ -329,18 +371,18 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         case TRACKING:
           // Have to switch to UI Thread to update View.
           this.runOnUiThread(
-              new Runnable() {
-                @Override
-                public void run() {
-                  fitToScanView.setVisibility(View.GONE);
-                }
-              });
+                  new Runnable() {
+                    @Override
+                    public void run() {
+                      fitToScanView.setVisibility(View.GONE);
+                    }
+                  });
 
           // Create a new anchor for newly found images.
           if (!augmentedImageMap.containsKey(augmentedImage.getIndex())) {
             Anchor centerPoseAnchor = augmentedImage.createAnchor(augmentedImage.getCenterPose());
             augmentedImageMap.put(
-                augmentedImage.getIndex(), Pair.create(augmentedImage, centerPoseAnchor));
+                    augmentedImage.getIndex(), Pair.create(augmentedImage, centerPoseAnchor));
           }
           break;
 
@@ -359,8 +401,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
       Anchor centerAnchor = augmentedImageMap.get(augmentedImage.getIndex()).second;
       switch (augmentedImage.getTrackingState()) {
         case TRACKING:
-          augmentedImageRenderer.draw(
-              viewmtx, projmtx, augmentedImage, centerAnchor, colorCorrectionRgba);
+          augmentedImageRenderer.draw(viewmtx, projmtx, augmentedImage, centerAnchor, colorCorrectionRgba);
           break;
         default:
           break;
